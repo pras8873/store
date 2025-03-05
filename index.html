@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Share</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <h2>Upload a File</h2>
@@ -17,75 +16,63 @@
     <button onclick="downloadFile()">Download</button>
     
     <script>
-        const CLIENT_ID = "575610715095-pkfl1i2deqkftrvhf5j6n90ooul70dnc.apps.googleusercontent.com";
-        const API_KEY = "AIzaSyAXTlwKLGjHqt0YNuZXHG6MBgBJE2kQubU";
-        const FOLDER_ID = "18b7EGhvKx6_qiVZKC3ngb7hBFnOWAq7a";
-        const SCOPES = "https://www.googleapis.com/auth/drive.file";
+        const GITHUB_USERNAME = "your_github_username";
+        const REPO_NAME = "your_repository_name";
+        const BRANCH = "main";
+        const ACCESS_TOKEN = "your_personal_access_token";
 
-        function authenticate() {
-            return gapi.auth2.getAuthInstance()
-                .signIn({ scope: SCOPES })
-                .then(() => console.log("Signed in successfully"))
-                .catch(err => console.error("Sign-in error", err));
-        }
-
-        function loadClient() {
-            gapi.client.setApiKey(API_KEY);
-            return gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest")
-                .then(() => console.log("Google Drive API loaded"))
-                .catch(err => console.error("Error loading API", err));
-        }
-
-        function uploadFile() {
+        async function uploadFile() {
             const key = document.getElementById("secretKey").value;
             const file = document.getElementById("fileInput").files[0];
             if (!key || !file) {
                 alert("Enter a key and select a file");
                 return;
             }
-            const metadata = {
-                name: key + "_" + file.name,
-                parents: [FOLDER_ID]
+            
+            const reader = new FileReader();
+            reader.onload = async function (event) {
+                const content = btoa(event.target.result);
+                const filePath = `${key}_${file.name}`;
+                
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${filePath}`, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `token ${ACCESS_TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: `Uploading ${file.name}`,
+                        content: content,
+                        branch: BRANCH
+                    })
+                });
+                
+                if (response.ok) {
+                    alert("File uploaded successfully!");
+                } else {
+                    alert("Upload failed");
+                }
             };
-            const form = new FormData();
-            form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-            form.append("file", file);
-
-            fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-                method: "POST",
-                headers: new Headers({ "Authorization": "Bearer " + gapi.auth.getToken().access_token }),
-                body: form
-            }).then(response => response.json())
-              .then(data => alert("File uploaded successfully!"))
-              .catch(err => console.error("Upload error", err));
+            reader.readAsBinaryString(file);
         }
 
-        function downloadFile() {
+        async function downloadFile() {
             const key = document.getElementById("downloadKey").value;
             if (!key) {
                 alert("Enter a secret key");
                 return;
             }
-            gapi.client.drive.files.list({
-                q: `'${FOLDER_ID}' in parents and name contains '${key}_'`,
-                fields: "files(id, name)"
-            }).then(response => {
-                if (response.result.files.length > 0) {
-                    const fileId = response.result.files[0].id;
-                    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
-                    window.location.href = downloadUrl;
-                } else {
-                    alert("File not found");
-                }
-            }).catch(err => console.error("Download error", err));
-        }
-
-        function initClient() {
-            gapi.load("client:auth2", () => {
-                gapi.auth2.init({ client_id: CLIENT_ID });
-            });
+            
+            const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/`);
+            const files = await response.json();
+            
+            const file = files.find(f => f.name.startsWith(key + "_"));
+            if (file) {
+                window.location.href = file.download_url;
+            } else {
+                alert("File not found");
+            }
         }
     </script>
-    <script src="https://apis.google.com/js/api.js" onload="initClient()"></script>
 </body>
 </html>
