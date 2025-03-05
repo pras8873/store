@@ -23,7 +23,7 @@
 
         async function uploadFile() {
             const key = document.getElementById("secretKey").value;
-            const file = document.getElementById("fileInput").files[0];
+            const file = document.getElementById("fileInput").files[0]; 
             if (!key || !file) {
                 alert("Enter a key and select a file");
                 return;
